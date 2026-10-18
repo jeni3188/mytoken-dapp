@@ -1,0 +1,44 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<h2>MyToken (MTK) Sepolia</h2>
+<p>Akun: <span id="a">-</span></p>
+<p>Saldo: <b id="b">-</b> MTK</p>
+<input id="to" placeholder="Alamat tujuan 0x..." style="width:100%">
+<input id="amt" placeholder="Jumlah" type="number">
+<button id="send">Kirim</button>
+<button id="conn">Hubungkan wallet</button>
+<p id="s"></p>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<script>
+const ADDR = "0xAAD528227ac827Dad8841d8E63EfA94321241c86";
+const ABI = ["function balanceOf(address) view returns (uint256)",
+             "function transfer(address,uint256) returns (bool)"];
+const $ = id => document.getElementById(id);
+let signer;
+async function connect() {
+  try {
+    if (!window.ethereum) { $("s").textContent = "Wallet tidak ditemukan"; return; }
+    const p = new ethers.BrowserProvider(window.ethereum);
+    await p.send("eth_requestAccounts", []);
+    await p.send("wallet_switchEthereumChain", [{ chainId: "0xaa36a7" }]);
+    signer = await p.getSigner();
+    $("a").textContent = signer.address;
+    refresh();
+  } catch (e) { $("s").textContent = e.shortMessage || e.message; }
+}
+async function refresh() {
+  const c = new ethers.Contract(ADDR, ABI, signer);
+  $("b").textContent = ethers.formatUnits(await c.balanceOf(signer.address), 18);
+}
+$("conn").onclick = connect;
+$("send").onclick = async () => {
+  try {
+    if (!signer) await connect();
+    const c = new ethers.Contract(ADDR, ABI, signer);
+    $("s").textContent = "Mengirim...";
+    await (await c.transfer($("to").value, ethers.parseUnits($("amt").value, 18))).wait();
+    $("s").textContent = "Sukses";
+    refresh();
+  } catch (e) { $("s").textContent = e.shortMessage || e.message; }
+};
+</script>

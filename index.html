@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="id">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MyToken Sepolia</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:#fff;color:#111}
+input,button{width:100%;box-sizing:border-box;padding:12px;margin:6px 0;font-size:16px;border-radius:8px;border:1px solid #888;background:transparent;color:inherit}
+button{background:#2563eb;color:#fff;border:0}
+.card{border:1px solid #ccc;border-radius:12px;padding:12px;margin:12px 0;word-break:break-all}
+@media (prefers-color-scheme:dark){body{background:#111;color:#eee}.card{border-color:#444}}
+a{color:#60a5fa}
+</style>
+<h2>MyToken Sepolia</h2>
+<div class="card">Token: <small id="tk"></small></div>
+<div class="card">Akun: <small id="a">-</small><br>Saldo: <b id="b">-</b></div>
+<button id="conn">Hubungkan wallet</button>
+<button id="ref">Refresh saldo</button>
+<input id="to" placeholder="Alamat tujuan 0x...">
+<input id="amt" placeholder="Jumlah" type="number" inputmode="decimal">
+<button id="send">Kirim</button>
+<p id="s"></p>
+<p id="lnk"></p>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const ADDR = new URLSearchParams(location.search).get("token")
+  || "0xAAD528227ac827Dad8841d8E63EfA94321241c86";
+const ABI = ["function balanceOf(address) view returns (uint256)",
+             "function transfer(address,uint256) returns (bool)",
+             "function symbol() view returns (string)"];
+let signer;
+$("tk").textContent = ADDR;
+async function connect() {
+  try {
+    if (!window.ethereum) { $("s").textContent = "Wallet tidak ditemukan. Buka lewat browser MetaMask."; return; }
+    const p = new ethers.BrowserProvider(window.ethereum);
+    await p.send("eth_requestAccounts", []);
+    await p.send("wallet_switchEthereumChain", [{ chainId: "0xaa36a7" }]);
+    signer = await p.getSigner();
+    $("a").textContent = signer.address;
+    refresh();
+  } catch (e) { $("s").textContent = e.shortMessage || e.message; }
+}
+async function refresh() {
+  try {
+    if (!signer) { await connect(); return; }
+    const c = new ethers.Contract(ADDR, ABI, signer);
+    const sym = await c.symbol();
+    $("b").textContent = ethers.formatUnits(await c.balanceOf(signer.address), 18) + " " + sym;
+  } catch (e) { $("s").textContent = e.shortMessage || e.message; }
+}
+$("conn").onclick = connect;
+$("ref").onclick = refresh;
+$("send").onclick = async () => {
+  try {
+    if (!signer) { await connect(); if (!signer) return; }
+    const c = new ethers.Contract(ADDR, ABI, signer);
+    $("s").textContent = "Mengirim..."; $("lnk").innerHTML = "";
+    const tx = await c.transfer($("to").value.trim(), ethers.parseUnits($("amt").value, 18));
+    $("lnk").innerHTML = '<a href="https://sepolia.etherscan.io/tx/' + tx.hash + '" target="_blank">Lihat di Etherscan</a>';
+    await tx.wait();
+    $("s").textContent = "Sukses";
+    refresh();
+  } catch (e) { $("s").textContent = e.shortMessage || e.message; }
+};
+</script>
+</html>
